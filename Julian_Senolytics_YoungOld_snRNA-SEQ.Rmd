@@ -1,0 +1,1626 @@
+---
+title: "R Notebook"
+output: html_notebook
+editor_options: 
+  chunk_output_type: console
+---
+
+## 1.1) Import packages
+```{r message=FALSE}
+#load libraries
+library(dplyr)
+library(ggpubr)
+library(Seurat)
+require(scales)
+library(tidyr)
+library(monocle)
+library(ggplot2)
+library(openxlsx)
+
+
+source("/media/EOS_ZMM_shared/Bioinformatic/scRNA-SEQ-ZMM/Import10X-HelperFunctions_SeuratV3.R")
+outputFolder<-"/media/Helios_scStorage/Julian/Senolytic-scRNA-SEQ-Mice/2ndRun/RawData/Seurat4/"
+sink(file = "/media/Helios_scStorage/Julian/Senolytic-scRNA-SEQ-Mice/2ndRun/RawData/Seurat4/Julian_Senolytics_YoungOld_snRNA-SEQ.rmd.log", append = TRUE, split = TRUE)
+```
+
+```{r}
+# Quick load
+rm(SeuratObjectList, SeuratObject.combined_ClusterTree, p1,p2, tmpList, SeuratObject.anchors)
+save.image("/media/Helios_scStorage/Julian/Senolytic-scRNA-SEQ-Mice/2ndRun/RawData/Seurat4/Workspace_04.11.2021.Julian_Senolytics_YoungOld_snRNA-SEQ_SenolyticsOnly.RData")
+load("/media/Helios_scStorage/Julian/Senolytic-scRNA-SEQ-Mice/2ndRun/RawData/Seurat4/Workspace_04.11.2021.Julian_Senolytics_YoungOld_snRNA-SEQ.RData")
+saveRDS(SeuratObject.combined, file = "/media/Helios_scStorage/Julian/Senolytic-scRNA-SEQ-Mice/2ndRun/RawData/Seurat4/Julian_Senolytica_SenolyticsOnly_02.12.21.Rds")
+SeuratObject.combined<-readRDS("/media/Helios_scStorage/Julian/Senolytic-scRNA-SEQ-Mice/2ndRun/RawData/Seurat4/Julian_Senolytica_02.12.21.Rds")
+rm(SeuratObjectcombined)
+```
+
+## 1.2) Define static parameters
+```{r}
+#Static Parameters 
+
+#Static Parameters
+
+
+Sample.Paths <- c(#"/media/ATLAS_NGS_storage/Julian-Wagner/scRNA-Seq_Mouse_RamonBerlin_/HeartData/Young1",
+                #"/media/ATLAS_NGS_storage/Julian-Wagner/scRNA-Seq_Mouse_RamonBerlin_/HeartData/Young2",
+                #"/media/ATLAS_NGS_storage/Julian-Wagner/scRNA-Seq_Mouse_RamonBerlin_/HeartData/Young3",
+                #"/media/ATLAS_NGS_storage/Julian-Wagner/scRNA-Seq_Mouse_RamonBerlin_/HeartData/Old1",
+                #"/media/ATLAS_NGS_storage/Julian-Wagner/scRNA-Seq_Mouse_RamonBerlin_/HeartData/Old2",
+                #"/media/ATLAS_NGS_storage/Julian-Wagner/scRNA-Seq_Mouse_RamonBerlin_/HeartData/Old3",
+                "/media/Helios_scStorage/Julian/Senolytic-scRNA-SEQ-Mice/2ndRun/RawData/starsolo/104383-014-001Solo.out/GeneFull/filtered",
+                "/media/Helios_scStorage/Julian/Senolytic-scRNA-SEQ-Mice/2ndRun/RawData/starsolo/104383-014-002Solo.out/GeneFull/filtered",
+                "/media/Helios_scStorage/Julian/Senolytic-scRNA-SEQ-Mice/2ndRun/RawData/starsolo/104383-014-003Solo.out/GeneFull/filtered",
+                "/media/Helios_scStorage/Julian/Senolytic-scRNA-SEQ-Mice/2ndRun/RawData/starsolo/104383-014-004Solo.out/GeneFull/filtered",
+                "/media/Helios_scStorage/Julian/Senolytic-scRNA-SEQ-Mice/2ndRun/RawData/starsolo/104383-014-005Solo.out/GeneFull/filtered",
+                "/media/Helios_scStorage/Julian/Senolytic-scRNA-SEQ-Mice/2ndRun/RawData/starsolo/104383-014-006Solo.out/GeneFull/filtered",
+                "/media/Helios_scStorage/Julian/Senolytic-scRNA-SEQ-Mice/2ndRun/RawData/starsolo/104383-014-007Solo.out/GeneFull/filtered")
+
+#Samplenames <- c("placebo-1","senolytica-1","senolytica-2","placebo-2","placebo-3","placebo-4","senolytica")
+#"Young-1","Young-2","Young-3","Old-1","Old-2","Old-3",
+Samplenames <- c("Old-4_plac","Old-5_seno","Old-6_seno","Old-7_plac","Old-8_place","Young-4_plac","Old-9_seno")
+
+# 'placebo, aged
+# senolytica, aged
+# senolytica, aged
+# placebo, aged
+# placebo, aged
+# placebo, young
+# senolytica, aged'
+
+```
+
+
+```{r}
+tmpList<-list()
+SeuratObjectList <- list()
+for (i in 1:length(Sample.Paths)) {
+  tmpList<-Importer(pathway = Sample.Paths[i],id = Samplenames[i], FilterCells = TRUE)
+  print(tmpList[[2]])
+  SeuratObjectList[[i]]<-tmpList[[1]]
+}
+```
+
+```{r}
+length(SeuratObjectList)
+#"Young-1","Young-2","Young-3","Old-1","Old-2","Old-3
+age_ind <- c("Old-4","Old-5","Old-6","Old-7","Old-8","Young-4","Old-9")
+#"Young","Young","Young","Old","Old","Old",
+age <- c("Old","Old","Old","Old","Old","Young","Old")
+#"Young-CTRL","Young-CTRL","Young-CTRL","Old-CTRL","Old-CTRL","Old-CTRL"
+condition2 <- c("Old-CTRL","Old-seno","Old-seno","Old-CTRL","Old-CTRL","Young-CTRL","Old-seno")
+#"ctrl","ctrl","ctrl","ctrl","ctrl","ctrl"
+senolytica<-c("ctrl","seno","seno","ctrl","ctrl","ctrl","seno")
+
+
+for (i in 1:length(SeuratObjectList)) {
+  cat(i)
+  SeuratObjectList[[i]][["age.ind"]]<-age_ind[[i]]
+  SeuratObjectList[[i]][["age"]]<-age[[i]]
+  SeuratObjectList[[i]][["condition2"]]<-condition2[[i]]
+  SeuratObjectList[[i]][["senolytica"]]<-senolytica[[i]]
+
+}
+```
+
+
+```{r}
+SeuratObject.anchors <- FindIntegrationAnchors(object.list = SeuratObjectList, dims = 1:20)
+SeuratObject.combined <- IntegrateData(anchorset = SeuratObject.anchors, dims = 1:20)
+```
+#INTEGRATED
+```{r}
+DefaultAssay(object = SeuratObject.combined) <- "integrated"
+
+# Run the standard workflow for visualization and clustering
+SeuratObject.combined <- ScaleData(object = SeuratObject.combined, verbose = FALSE)
+SeuratObject.combined <- RunPCA(object = SeuratObject.combined, npcs = 30, verbose = FALSE)
+# t-SNE and Clustering
+SeuratObject.combined <- RunUMAP(object = SeuratObject.combined, reduction = "pca", dims = 1:10)
+SeuratObject.combined <- FindNeighbors(object = SeuratObject.combined, reduction = "pca", dims = 1:10)
+SeuratObject.combined <- FindClusters(SeuratObject.combined, resolution = 0.3)
+```
+
+
+```{r}
+SeuratObject.combined_ClusterTree<-BuildClusterTree(object = SeuratObject.combined, assay = "RNA", verbose = T)
+PlotClusterTree(SeuratObject.combined_ClusterTree)
+```
+
+
+####All Samples combined
+```{r fig.height=10, fig.width=20}
+require(cowplot)
+# Visualization
+p1<-DimPlot(object = SeuratObject.combined, reduction = "umap", group.by = "orig.ident",pt.size = 1)
+p2<-DimPlot(object = SeuratObject.combined, reduction = "umap", label = TRUE,pt.size = 1, label.size = 9)
+#p3<-DimPlot(object = SeuratObject.combined, reduction = "umap", group.by = "sample",pt.size = 2)
+p1 + p2
+
+p<-DimPlot(object = SeuratObject.combined, reduction = "umap", group.by = "Celltypes",pt.size = 1, label = TRUE)
+ggsave(plot = p, filename = "/media/Helios_scStorage/Julian/Senolytic-scRNA-SEQ-Mice/2ndRun/RawData/Seurat4/UMAP.png", device = "png", width = 10, height = 6)
+
+DimPlot(object = SeuratObject.combined, reduction = "umap", label = TRUE, split.by = "orig.ident")
+Idents(SeuratObject.combined)<-"seurat_clusters"
+DimPlot(object = SeuratObject.combined, reduction = "umap", label = TRUE, split.by = "condition", label.size = 8, pt.size = 1)
+
+
+
+```
+
+```{r}
+SeuratObject.combined$seurat_clusters<-SeuratObject.combined$integrated_snn_res.0.3
+```
+
+
+Find Cluster specific Markers
+```{r}
+library(xlsx)
+SeuratObject.combined.markers <- FindAllMarkers(object = SeuratObject.combined, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+top20<-SeuratObject.combined.markers %>% group_by(cluster) %>% top_n(n = 30, wt = avg_log2FC)
+write.csv(top20, file = paste0(outputFolder,"top30ClusterMarkers.csv"))
+write.xlsx(as.data.frame(top20), file = paste0(outputFolder,"top30ClusterMarkers.xlsx"), )
+
+write.csv(SeuratObject.combined.markers, file = paste0(outputFolder,"ClusterMarkersAll_SenolyticOnly.csv"))
+write.xlsx(SeuratObject.combined.markers, file = paste0(outputFolder,"ClusterMarkersAll_SenolyticOnly.xlsx"))
+
+```
+
+
+
+```{r}
+
+meta.data<-SeuratObject.combined@meta.data
+library(dplyr)
+top20<-SeuratObject.combined.markers %>% group_by(cluster) %>% top_n(n = 5, wt = avg_log2FC)
+DotPlot(SeuratObject.combined, features = unique(top20$gene), group.by = "seurat_clusters") + theme(axis.text.x = element_text(angle = 90, size = 8))
+ggsave(filename = paste0(outputFolder,"ClusterMarkersAll_dotplot_SenolyticOnly.pdf"), device = "pdf", width = 9, height = 5, )
+
+```
+
+
+
+## 3.1.6) Barplot of cell per cluster
+```{r fig.height=10, fig.width=15}
+# Counting celltypes in timepoints
+library(tidyr)
+
+library(dplyr)
+library(ggplot2)
+library(scales)
+library(Seurat)
+library(stringr)
+V<- SeuratObject.combined@meta.data
+orig.ident.ordered<-str_sort(unique(SeuratObject.combined@meta.data$orig.ident),numeric = TRUE)
+V$orig.ident<-factor(V$orig.ident)
+V$res.0.6<-factor(V$Celltypes)
+V$senolytica
+Summary.Celltypes <- V %>% count(orig.ident,res.0.6, senolytica,.drop = FALSE) %>% group_by(orig.ident) %>%
+  mutate(freq = n /sum(n)) %>% complete(res.0.6,fill = list(n=0,freq=0))
+
+Summary.Celltypes$res.0.6 <- factor(Summary.Celltypes$res.0.6)
+condition<-c()
+for (x in Summary.Celltypes$res.0.6) {
+  tmp<-unlist(strsplit(x,split = "-"))
+  cx<-paste0(tmp[1:length(tmp)-1],collapse = "-")
+  
+  condition<-c(condition,cx)
+  
+}
+Summary.Celltypes$condition<-condition
+
+svg(filename = paste0(outputFolder,"/Barplot-CellsperClusterPerSample_SenolyticOnly.svg"),width = 15, height = 10)
+p<-ggplot(Summary.Celltypes, aes(x=orig.ident, y= freq, fill= senolytica))+
+  geom_col(width = 0.9, color = "black")+
+  facet_wrap(~res.0.6, nrow = 4, scales = "free")+
+  scale_y_continuous(name = "Percent per timepoint", labels = scales::percent_format())+
+  theme(panel.background = element_blank(),
+        strip.text = element_text(size=12),
+        axis.title.x = element_blank(),
+        axis.text.x = element_text(angle = 45, hjust= 1, size = 10))
+
+ggsave(plot = p, filename = "/media/Helios_scStorage/Julian/Senolytic-scRNA-SEQ-Mice/2ndRun/RawData/Seurat4/Barplot_SenoperCelltype_byOrigIdent.png", device = "png", width = 10, height = 6)
+
+dev.off()
+
+
+```
+```{r}
+VlnPlot(SeuratObject.combined, features = c("Ttn","Dcn","Rgs5"), group.by = "seurat_clusters", pt.size = 0)
+```
+
+
+                                    TODOs:
+```{r}
+#1.) DEG's 
+  #1.1 Young vs Old
+  meta.data<-SeuratObject.combined@meta.data
+  Idents(SeuratObject.combined) <- "condition2"
+  table(Idents(SeuratObject.combined))
+  DEGs_young_vs_Old <- FindMarkers(SeuratObject.combined, ident.1 = "Young-CTRL", ident.2 = "Old-CTRL")
+
+  
+  pvalues<-do_cluster_t_test(seurat_subset = SeuratObject.combined, degs = DEGs_young_vs_Old)
+  pvalues<-data.frame(clustered.ttest=unlist(pvalues))
+
+  
+  DEGs_young_vs_Old.merged<-merge(x = DEGs_young_vs_Old, pvalues, by = "row.names")
+  write.xlsx(DEGs_young_vs_Old.merged, file = paste0(outputFolder,"DEGs_young_vs_Old_SenolyticOnly.xlsx"))
+  
+
+ 
+   #1.2 Old vs Seno
+  DEGs_seno_vs_Old <- FindMarkers(SeuratObject.combined, ident.1 = "Old-seno", ident.2 = "Old-CTRL")
+
+  pvalues<-do_cluster_t_test(seurat_subset = SeuratObject.combined, degs = DEGs_seno_vs_Old)
+  pvalues<-data.frame(clustered.ttest=unlist(pvalues))
+
+  
+  DEGs_seno_vs_Old.merged<-merge(x = DEGs_seno_vs_Old, pvalues, by = "row.names")
+  write.xlsx(DEGs_seno_vs_Old.merged, file = paste0(outputFolder,"DEGs_seno_vs_Old_SenolyticOnly.xlsx"))
+
+  top30<-DEGs_seno_vs_Old.merged %>% top_n(n = 30, wt = avg_log2FC)
+  FeatureHeatmap(SeuratObject.combined, features = top30$Row.names, group.by = "orig.ident")
+  
+  
+```
+
+
+#Rename Idents
+```{r}
+SeuratObject.combined <- readRDS("/media/Helios_scStorage/Julian/Senolytic-scRNA-SEQ-Mice/2ndRun/RawData/Seurat4/Julian_Senolytica_SenolyticsOnly_02.12.21.Rds")
+
+#Reanalysis David 22.02.20222
+SeuratObject.combined$celltypes <- ifelse(SeuratObject.combined$seurat_clusters %in% c("0"), "Cardiomyocytes", 
+                  ifelse(SeuratObject.combined$seurat_clusters %in% c("1"), "Fibroblasts",
+                  ifelse(SeuratObject.combined$seurat_clusters %in% c("9","3", "6", "8","5","7"), "Endothelial cells",
+                  ifelse(SeuratObject.combined$seurat_clusters %in% c("2"), "Lyve1+",
+                  ifelse(SeuratObject.combined$seurat_clusters %in% c("4"), "Immune cells",
+                  ifelse(SeuratObject.combined$seurat_clusters %in% c("10"), "Pacemaker cells",
+                  ifelse(SeuratObject.combined$seurat_clusters %in% c("11", "14"), "Pericyte",
+                  ifelse(SeuratObject.combined$seurat_clusters %in% c("12"), "Lymphocytes", 
+                  ifelse(SeuratObject.combined$seurat_clusters %in% c("13"), "FB/Pericyte", "unknown")))))))))
+
+
+saveRDS(SeuratObject.combined,file = "/media/Helios_scStorage/Julian/Senolytic-scRNA-SEQ-Mice/2ndRun/RawData/Seurat4/Julian_Senolytica_SenolyticsOnly_02.12.21.Rds")
+```
+
+#Calculate DEG per Celltype
+```{r}
+library("openxlsx")
+SeuratObject.combined$Celltypes<-SeuratObject.combined$celltypes
+celltypes<-names(table(SeuratObject.combined.old$celltypes))
+Idents(SeuratObject.combined)<-"celltypes"
+table(SeuratObject.combined$condition, SeuratObject.combined$celltypes)
+
+Idents(SeuratObject.combined)<-"condition"
+table(SeuratObject.combined$condition,SeuratObject.combined$orig.ident)
+SeuratObject.combined.old<-subset(SeuratObject.combined, idents="Old")
+finalTable<-data.frame()
+Idents(SeuratObject.combined.old)<-"celltypes"
+
+for (celltype in celltypes) {
+  seurat.celltype<-subset(SeuratObject.combined.old, idents=c(celltype))
+  
+  Idents(seurat.celltype)<-"condition2"
+  DEG.celltype<-FindMarkers(seurat.celltype, ident.1 = "Old-seno", ident.2 = "Old-CTRL",assay = "RNA", slot = "data", logfc.threshold = 0.1, min.pct = 0.1, test.use = "wilcox")
+
+  pvalues<-do_cluster_t_test(seurat.celltype, DEG.celltype, group="senolytica",cluster = "orig.ident")
+  pvalues<-data.frame(clustered.ttest=unlist(pvalues))
+
+  DEG.celltype<-merge(x = DEG.celltype, pvalues, by = "row.names")
+  DEG.celltype$celltype<-celltype
+  finalTable<-rbind(finalTable,DEG.celltype)
+  
+  
+  
+}
+
+
+
+table(SeuratObject.combined$Celltypes)
+table (finalTable$celltype)
+finalTable2 <- finalTable %>% filter(p_val < 0.05)
+
+write.csv2(finalTable, file = paste0(outputFolder,"DEG_Old-seno_vs_Old-CTRL.PerCelltype_logFC>0.1_minPct>0.1_OldSenolyticOnly.csv"), row.names = F)
+openxlsx::write.xlsx(finalTable, file = paste0(outputFolder,"DEG_Old-seno_vs_Old-CTRL.PerCelltype_logFC>0.1_minPct>0.1_OldSenolyticOnly.xlsx"), row.names = F
+)
+
+
+
+```
+
+#Heatmap of genes fold 1,4 für hoch und 0,8 für runter
+```{r}
+
+
+
+```
+
+
+
+
+
+#Plots for Julian 24.02.22 (David)
+```{r}
+Sema4a
+Sema6b
+Sema3a
+Vegfb 
+
+table(SeuratObject.combined.old$condition2)
+SeuratObject.combined.old$condition<-SeuratObject.combined.old$condition2
+p<-doMeanSemBarplot(SeuratObject = SeuratObject.combined.old, Features = c("Sema4a","Sema6b","Sema3a","Vegfb"), ListTest = )
+ggsave(filename = paste0(outputFolder,"Barplot_Sema4a_Sema6b_Seam3a_Vegfb_OldSenolyticOnly.pdf"), device = "pdf", width = 9, height = 5, )
+
+#VlnPlots
+genes<- c("Sema4a","Sema6b","Sema3a","Vegfb")
+for (gene in genes) {
+  p<-VlnPlot(SeuratObject.combined.old, features = gene, group.by = "Celltypes", split.by = "condition", pt.size = 0.1, assay = "RNA",slot = "data")
+  ggsave(filename = paste0(outputFolder,"Vlnplot_",gene,"_OldSenolyticOnly.pdf"), device = "pdf", width = 9, height = 5, )
+
+}
+VlnPlot(SeuratObject.combined.old, features = "Sema3a", group.by = "Celltypes", split.by = "condition", pt.size = 0.1)
+
+#VlnPlots only EC's
+genes<- c("Sema4a","Sema6b","Sema3a","Vegfb")
+
+Idents(SeuratObject.combined.old)<-"Celltypes"
+SeuratObject.combined.old.ec<-subset(SeuratObject.combined.old, idents="Endothelial cells")
+VlnPlot(SeuratObject.combined.old.ec, features = genes, group.by = "condition", pt.size = 0.1, assay = "RNA",slot = "data") 
+ggsave(filename = paste0(outputFolder,"Vlnplot_EC_Sema4a_Sema6b_Seam3a_Vegfb_OldSenolyticOnly.pdf"), device = "pdf", width = 9, height = 5, )
+
+p<-doMeanSemBarplot(SeuratObject = SeuratObject.combined.old.ec, Features = c("Sema4a","Sema6b","Sema3a","Vegfb"), ListTest = ) + ggtitle("EC")
+ggsave(filename = paste0(outputFolder,"Barplot_EC_Sema4a_Sema6b_Seam3a_Vegfb_OldSenolyticOnly.pdf"), device = "pdf", width = 9, height = 5, )
+
+
+VlnPlot(SeuratObject.combined.old, features = "Sema3a", group.by = "Celltypes", split.by = "condition", pt.size = 0.1)
+
+
+```
+
+
+
+#test clustered ttest individually
+```{r}
+
+degs<-DEG.celltype
+seurat_subset<-seurat.celltype
+
+gene_names<- names(table(rownames(degs)))
+  #print(head(gene_names))
+  p_values <- vector("list",length(gene_names))
+  names(p_values) <- gene_names
+  #gene_names <- row.names(cluster_subset)
+  #if (celltype=="Adipocytes"){
+  #  seurat_subset <- seurat_subset[,!seurat_subset$orig.ident=="D7"]
+  #}
+  group <- seurat_subset[["senolytica"]][,1]
+  cluster <- seurat_subset[["orig.ident"]][,1]
+  gene<-"Prr29"
+  for (gene in gene_names){
+    y <- c(t(as.matrix(seurat_subset@assays$RNA[gene,])))
+    test_info <- my.t.test.cluster(y, cluster, group)
+    test_info2<-t.test.cluster(y, cluster, group)
+    p_values[[gene]] <- test_info[nrow(test_info)]
+  }
+  return(p_values)
+```
+
+
+
+#Calculate DEG per Celltype
+```{r}
+library("xlsx")
+celltypes<-names(table(SeuratObject.combined$celltypes))
+Idents(SeuratObject.combined)<-"celltypes"
+table(SeuratObject.combined$condition)
+
+
+finalTable<-data.frame()
+for (celltype in celltypes) {
+  seurat.celltype<-subset(SeuratObject.combined, idents=c(celltype))
+  
+  Idents(seurat.celltype)<-"condition2"
+  DEG.celltype<-FindMarkers(seurat.celltype, ident.1 = "Young-CTRL", ident.2 = "Old-CTRL",assay = "RNA", slot = "data", logfc.threshold = log(1.3), min.pct = 0.2, min.diff.pct = 0.1, test.use = "wilcox")
+
+  pvalues<-do_cluster_t_test(seurat.celltype, DEG.celltype, group="condition",cluster = "orig.ident")
+  pvalues<-data.frame(clustered.ttest=unlist(pvalues))
+
+  DEG.celltype<-merge(x = DEG.celltype, pvalues, by = "row.names")
+  DEG.celltype$celltype<-celltype
+  finalTable<-rbind(finalTable,DEG.celltype)
+  
+}
+outputFolder
+write.csv2(finalTable, file = paste0(outputFolder,"DEG_Young-CTRL_vs_Old-CTRL.PerCluster_logFC>0.1_minPct>0.1.csv"), row.names = F)
+write.xlsx(finalTable, file = paste0(outputFolder,"DEG_Young-CTRL_vs_Old-CTRL.PerCluster_logFC>0.1_minPct>0.1.xlsx"), row.names = F)
+
+```
+
+#Senecese Marker: TP53
+
+```{r}
+Idents(SeuratObject.combined)<- "celltypes"
+SeuratObject.lymphEC<-subset(SeuratObject.combined, idents=c("Lymph-EC"))
+VlnPlot(SeuratObject.lymphEC, features = "Sema3a", group.by = "condition2")
+
+SeuratObject.EC2<-subset(SeuratObject.combined, idents=c("EC-2"))
+VlnPlot(SeuratObject.EC2, features = "Sema3a", group.by = "condition2")
+VlnPlot(SeuratObject.combined, features = "Zbtb16", group.by = "condition2", pt.size = 0.01, split.by = "celltypes")
+
+```
+#Request Julian 17.12.2021
+```{r}
+table(SeuratObject.combined$Celltypes)
+Idents(SeuratObject.combined)<-"Celltypes"
+DefaultAssay(SeuratObject.combined)<-"RNA"
+ECs <- subset(SeuratObject.combined, idents=c("Endothelial cells"))
+
+DefaultAssay(ECs)
+
+Idents(ECs)<-"condition2"
+table(ECs$condition2)
+ECs$condition2<-factor(ECs_2$condition2, levels = c("Young-CTRL","Old-CTRL","Old-seno"))
+
+VlnPlot(ECs_2, features = c("Sema3a","Vegfb","Manf","Ephb1","Nrtn", "Ntn1", "Slit3", "Il1b"), assay = "RNA",slot = "data")
+cat("Young vs Old")
+
+df<-data.frame()
+df<-FindMarkers(ECs_2, features =  c("Sema3a","Vegfb"), ident.1 = "Young-CTRL", ident.2 = "Old-CTRL", min.pct = 0, logfc.threshold = 0 )
+
+df2<-FindMarkers(ECs_2, features =  c("Sema3a","Vegfb"), ident.1 = "Young-CTRL", ident.2 = "Old-seno", min.pct = 0, logfc.threshold = 0 )
+df3<-FindMarkers(ECs_2, features =  c("Sema3a","Vegfb"), ident.1 = "Old-CTRL", ident.2 = "Old-seno", min.pct = 0, logfc.threshold = 0 )
+df.final<-rbind(df,df2,df3)
+write.xlsx(x = df.final, file = paste0(outputFolder,"DEG_Sema3a_Vegfb_allconditions.xlsx"))
+level(SeuratObject.combined$condition2)
+```
+
+Request Julian 20.12.21
+```{r}
+1.) Heatmap DEG Young vs Old vs senolytica (take union of genes which are regulated in Young vs Old and Seno vs Old) for each celltype 
+
+
+2.) VLNplots + statistics for marker genes (DONE)
+
+table(SeuratObject.combined$Celltypes)
+Idents(SeuratObject.combined)<-"Celltypes"
+DefaultAssay(SeuratObject.combined)<-"RNA"
+ECs <- subset(SeuratObject.combined, idents=c("Endothelial cells"))
+
+DefaultAssay(SeuratObject.combined)
+
+Idents(ECs)<-"condition2"
+table(ECs$condition2)
+ECs_old<-subset(ECs, idents = c("Old-CTRL","Old-seno"))
+ECs_old$condition2<-factor(ECs$condition2, levels = c("Old-CTRL","Old-seno"))
+
+VlnPlot(ECs_old, features = c("Sema3a","Ntn1","Slit3","Vegfb","Nrtn","Manf"), assay = "RNA",slot = "data")
+VlnPlot(SeuratObject.combined, features = c("Sema3a"), assay = "RNA",slot = "data", group.by = "Celltypes", split.by = "condition2")
+#,"Ephb1", "Il1b"
+cat("Young vs Old")
+
+
+df3<-FindMarkers(ECs_old, features =  c("Sema3a","Ntn1","Slit3","Vegfb","Nrtn","Manf"), ident.1 = "Old-CTRL", ident.2 = "Old-seno", min.pct = 0, logfc.threshold = 0 )
+df.final<-rbind(df,df2,df3)
+write.xlsx(x = df3, file = paste0(outputFolder,"DEG_MarkerGenesStefanie_Old_CTRL_vs_Old_Seno.xlsx"), colNames=TRUE, rowNames=TRUE)
+level(SeuratObject.combined$condition2)
+ 
+
+3.) Number of DEGs Old vs Old-seno per Celltype
+
+```
+
+```{r}
+p<-DimPlot(SeuratObject.combined, group.by ="Celltypes", label = T)
+library(ggplot2)
+ggsave("/media/Helios_scStorage/Julian/Senolytic-scRNA-SEQ-Mice/2ndRun/RawData/Seurat4/UMAP_celltypes.svg", p, width = 12, height = 6 )
+```
+
+
+# Lukas Senescence Score Calc 220210 
+
+```{r}
+# Senolytica Analysis Senescence Score
+
+setwd("/media/tombor/Helios_scStorage/Lukas/Analysis/For other Projects/For Julian/Senolytica")
+
+Seno <- readRDS("/media/Helios_scStorage/Julian/Senolytic-scRNA-SEQ-Mice/2ndRun/RawData/Seurat4/Julian_Senolytica_SenolyticsOnly_02.12.21.Rds")
+library(Seurat)
+library(ggplot2)
+library(tidyverse)
+DefaultAssay(Seno) < "RNA"
+
+SEM <- function(x){sd(x)/sqrt(length(x))}
+
+is.expressed <- function(Seurat, Genes){
+  expressed <- NULL
+  for (i in Genes){
+    skip_to_next <- FALSE
+    
+    tryCatch(if(length(Seurat@assays$RNA@data[i,] == length(rownames(Seurat@meta.data)))){expressed = c(expressed, i)}, error = function(e) { skip_to_next <<- TRUE})
+    
+    if(skip_to_next) { next } 
+  }
+  return(expressed)
+}
+
+Idents(Seno) <- "seurat_clusters"
+DimPlot(Seno, label = T) + labs(title = "Senolytica Dataset", x = "UMAP 1", y = "UMAP 2") + 
+  theme(legend.position = "none", axis.line = element_line(size = 1), plot.title = element_text(hjust = 0.5), axis.ticks = element_blank(), axis.text = element_blank())
+
+Markers <- c("Cdh5", "Pecam1", "Vwf", "Lyve1", "Prox1", "Pdpn")
+
+DefaultAssay(Seno) <- "RNA"
+FeaturePlot(Seno, features = Markers, cols = c("grey96", "black"))
+
+DotPlot(Seno, features = Markers, cols = c("grey96", "black"))
+
+Seno$Celltype <- ifelse(Seno$seurat_clusters %in% c(3, 5:9), "EC", "other")
+
+Idents(Seno) <- "Celltype"
+
+DimPlot(Seno, label = T, cols = c("grey90", "orange"), repel = T, label.box = T, label.color = c("grey40", "darkred")) + labs(title = "Senolytica Endothelial cells", x = "UMAP 1", y = "UMAP 2") + 
+  theme(legend.position = "none", axis.line = element_line(size = 1), plot.title = element_text(hjust = 0.5), axis.ticks = element_blank(), axis.text = element_blank())
+
+ECs <- subset(Seno, Celltype == "EC")
+
+Senesces_core <- c("Cdkn2a", "Bmi1", "Trp53", "Hmga1", "Chek1", "Chek2", "Prodh", "Tnfrsf10b", "Cdkn1a", "Dao")
+Senesces_core <- is.expressed(ECs, Senesces_core)
+
+# Calculate senescence score
+ECs  <- AddModuleScore(ECs , features = list(c(Senesces_core)), name = "Senescence_core", ctrl = 100)
+
+# Plot cell densitiy to show distribution of cells over the whole range of the senescence score.
+
+table(ECs$condition2)
+
+ECs$condition2 <- factor(ECs$condition2, levels = c("Young-CTRL", "Old-CTRL", "Old-seno"))
+
+metadata <- ECs@meta.data
+metadata
+
+# get local minimum of cell density: use to set lowest thresholds to assign senescence low cells
+# Set second threshold at senescence-score = 0!! Everything above 0 will be grouped as "high senescent"
+test <- density(metadata$Senescence_core1, n= length(metadata$Senescence_core1))
+y.minimum <- min(test$y[test$x > -0.05 & test$x < -0])
+x.minimum <- which(test$y == y.minimum)
+local.min <- test$x[x.minimum]
+
+# First plot: Density plot for all cells, both young and old combined:
+a <- ggplot(metadata, aes(x = Senescence_core1))+
+  geom_density()+
+  labs(subtitle = paste("Total of",length(rownames(metadata)),"cells"), x ="Senescence score", y ="Cell density")+
+  geom_vline(xintercept = local.min, color = "darkred", linetype = "dashed")+
+  annotate("text", local.min + 0.05, y = 6, label = paste0("Treshold\n", round(local.min, 4)), color = "darkred")+
+  theme_classic()+
+  theme(axis.text.x = element_text(size = 10, face = "bold", color = "black"), 
+        axis.text.y = element_text(size = 12, color = "black"), 
+        axis.title = element_text(size = 12, color = "black"), 
+        plot.title = element_text(face  = "bold", size = 15, hjust = 0.5), 
+        plot.subtitle = element_text(face = "italic", size = 10, hjust = 0.5), 
+        axis.line = element_line(color = "black", size = .6))
+
+# Second plot: Overlay of density plots for young & old mice, for all AMI timepoints.
+b <- ggplot(metadata, aes(x = Senescence_core1, group = condition2, fill = condition2)) + 
+  geom_density() + 
+  #scale_fill_manual(values = c("#FBB4AE", "#B3CDE3", ""))+
+  facet_grid(condition2~.)+
+  geom_vline(xintercept = local.min, color = "darkred", linetype = "dashed")+
+  labs(x ="Senescence score", y ="Cell density") +
+  theme_classic()+ 
+  theme(axis.text.x = element_text(size = 10, face = "bold", color = "black"), 
+        axis.text.y = element_text(size = 12, color = "black"), 
+        axis.title = element_text(size = 12, color = "black"), 
+        plot.title = element_text(face = "bold", size = 15, hjust = 0.5), 
+        plot.subtitle = element_text(face = "italic", size = 10, hjust = 0.5), 
+        axis.line = element_line(color = "black", size = .6), legend.position = "bottom")
+
+c <- ggplot(metadata, aes(x = condition2, y = Senescence_core1, fill = condition2)) + 
+  geom_boxplot()+ 
+  #scale_fill_manual(values = c("#FBB4AE", "#B3CDE3", ""))+
+  labs(y ="Senescence score", x = "Group")+
+  theme_classic()+ 
+  theme(axis.text.x = element_text(size = 10, face = "bold", color = "black"), 
+        axis.text.y = element_text(size = 12, color = "black"), 
+        axis.title = element_text(size = 12, color = "black"), 
+        plot.title = element_text(face = "bold", size = 15, hjust = 0.5), 
+        plot.subtitle = element_text(face = "italic", size = 10, hjust = 0.5), 
+        axis.line = element_line(color = "black", size = .6), legend.position = "bottom")
+
+# Combine plots
+plots <- ggarrange(a,b,c, ncol = 1, heights = c(.3,.6, 0.5))
+annotate_figure(plots, top = text_grob("Senescence Core Score in\n Endothelial cells", face = "bold", size = 16))
+
+
+# Assign cells to senescence group based on specified thresholds (high, low, or intermediate)
+ECs$Senescence_group <- ifelse(ECs$Senescence_core1 < 0 , "Senescence low","Senescence high")
+
+
+# Subset EC into groups, Find DEGs for senescence high/low cells , Perform table organisation
+EC.y.ctrl <- subset(ECs, subset = condition2 == "Young-CTRL")
+Idents(EC.y.ctrl) <- "Senescence_group"
+DEG.EC.y.ctrl <- FindMarkers(EC.y.ctrl, logfc.threshold = 0.2, test.use = "MAST", 
+                                ident.1 = "Senescence high", ident.2 = "Senescence low")
+DEG.EC.y.ctrl$Gene = rownames(DEG.EC.y.ctrl)
+DEG.EC.y.ctrl$Senescence <- ifelse(DEG.EC.y.ctrl$avg_log2FC > 0, "Senescence high cells", "Senescence low cells")
+DEG.EC.y.ctrl  <- DEG.EC.y.ctrl  %>%  filter(p_val_adj < 0.01) %>% select(Gene, Senescence, avg_log2FC, p_val_adj)
+
+# 2.
+EC.o.ctrl <- subset(ECs, subset = condition2 == "Old-CTRL")
+Idents(EC.o.ctrl) <- "Senescence_group"
+DEG.EC.o.ctrl <- FindMarkers(EC.o.ctrl, logfc.threshold = 0.2, test.use = "MAST", 
+                                ident.1 = "Senescence high", ident.2 = "Senescence low")
+DEG.EC.o.ctrl$Gene = rownames(DEG.EC.o.ctrl)
+DEG.EC.o.ctrl$Senescence <- ifelse(DEG.EC.o.ctrl$avg_log2FC > 0, "Senescence high cells", "Senescence low cells")
+DEG.EC.o.ctrl  <- DEG.EC.o.ctrl  %>%  filter(p_val_adj < 0.01) %>% select(Gene, Senescence, avg_log2FC, p_val_adj)
+
+
+# 3.
+EC.o.seno <- subset(ECs, subset = condition2 == "Old-seno")
+Idents(EC.o.seno) <- "Senescence_group"
+DEG.EC.o.seno <- FindMarkers(EC.o.seno, logfc.threshold = 0.2, test.use = "MAST", 
+                             ident.1 = "Senescence high", ident.2 = "Senescence low")
+DEG.EC.o.seno$Gene = rownames(DEG.EC.o.seno)
+DEG.EC.o.seno$Senescence <- ifelse(DEG.EC.o.seno$avg_log2FC > 0, "Senescence high cells", "Senescence low cells")
+DEG.EC.o.seno  <- DEG.EC.o.seno  %>%  filter(p_val_adj < 0.01) %>% select(Gene, Senescence, avg_log2FC, p_val_adj)
+
+
+# High
+EC.sen.high <- subset(ECs, subset = Senescence_group == "Senescence high")
+Idents(EC.sen.high) <- "condition2"
+DEG.EC.sen.high <- FindAllMarkers(EC.sen.high, logfc.threshold = 0.2, test.use = "MAST")
+DEG.EC.sen.high  <- DEG.EC.sen.high  %>%  filter(p_val_adj < 0.01) %>% select(cluster, gene, avg_log2FC, p_val_adj) %>% mutate(Senescence = "Senescence high")
+
+# Low
+EC.sen.low <- subset(ECs, subset = Senescence_group == "Senescence low")
+Idents(EC.sen.low) <- "condition2"
+DEG.EC.sen.low <- FindAllMarkers(EC.sen.low, logfc.threshold = 0.2, test.use = "MAST")
+DEG.EC.sen.low  <- DEG.EC.sen.low  %>%  filter(p_val_adj < 0.01) %>% select(cluster, gene, avg_log2FC, p_val_adj) %>% mutate(Senescence = "Senescence low")
+
+# Save DEG lists into excel
+
+library(xlsx)
+
+write.xlsx(DEG.EC.y.ctrl, "221002_DEG_lists_Senescence_vs_no_Senescence.xlsx", row.names = F, sheetName = "DEG Young CTRL")
+write.xlsx(DEG.EC.o.ctrl, "221002_DEG_lists_Senescence_vs_no_Senescence.xlsx", row.names = F, sheetName = "DEG Old CTRL", append = T)
+write.xlsx(DEG.EC.o.seno, "221002_DEG_lists_Senescence_vs_no_Senescence.xlsx", row.names = F, sheetName = "DEG Old Seno", append = T)
+write.xlsx(DEG.EC.sen.high, "221002_DEG_lists_Senescence_Comparisons.xlsx", row.names = F, sheetName = "DEG high senescence cells")
+write.xlsx(DEG.EC.sen.low, "221002_DEG_lists_Senescence_Comparisons.xlsx", row.names = F, sheetName = "DEG low senescence cells")
+
+```
+
+#Edit LT 220216 DEG of senolytica vs control in all celltypes 
+```{r}
+Seno <- readRDS("/media/Helios_scStorage/Julian/Senolytic-scRNA-SEQ-Mice/2ndRun/RawData/Seurat4/Julian_Senolytica_SenolyticsOnly_02.12.21.Rds")
+library(Seurat)
+library(ggplot2)
+library(tidyverse)
+DefaultAssay(Seno) < "RNA"
+
+SEM <- function(x){sd(x)/sqrt(length(x))}
+
+is.expressed <- function(Seurat, Genes){
+  expressed <- NULL
+  for (i in Genes){
+    skip_to_next <- FALSE
+    
+    tryCatch(if(length(Seurat@assays$RNA@data[i,] == length(rownames(Seurat@meta.data)))){expressed = c(expressed, i)}, error = function(e) { skip_to_next <<- TRUE})
+    
+    if(skip_to_next) { next } 
+  }
+  return(expressed)
+}
+
+### Annotate Celltypes
+
+Seno$Celltypes <- ifelse(Seno$seurat_clusters %in% c("0"), "Cardiomyocytes", 
+                  ifelse(Seno$seurat_clusters %in% c("1"), "Fibroblasts",
+                  ifelse(Seno$seurat_clusters %in% c("9"), "Endothelial cells",
+                  ifelse(Seno$seurat_clusters %in% c("2"), "Lyve1+",
+                  ifelse(Seno$seurat_clusters %in% c("4"), "Immune cells",
+                  ifelse(Seno$seurat_clusters %in% c("3", "6", "8"), "Arterial endothelial cells",
+                  ifelse(Seno$seurat_clusters %in% c("5","7"), "Venous endothelial cells",      
+                  ifelse(Seno$seurat_clusters %in% c("10"), "Pacemaker/Conduction Cardiomyocyte",
+                  ifelse(Seno$seurat_clusters %in% c("11", "14"), "Pericyte",
+                  ifelse(Seno$seurat_clusters %in% c("12"), "Lymphocytes", 
+                  ifelse(Seno$seurat_clusters %in% c("13"), "FB/Pericyte", "unknown")))))))))))
+
+
+
+table(Seno$seurat_clusters, Seno$Celltypes)
+
+Idents(Seno) <- "Celltypes"
+
+DimPlot(Seno, label = T, repel = T, label.box = T) + labs(title = "Senolytica Dataset", x = "UMAP 1", y = "UMAP 2") + 
+  theme(legend.position = "none", axis.line = element_line(size = 1), plot.title = element_text(hjust = 0.5), axis.ticks = element_blank(), axis.text = element_blank())
+
+Seno$sample <- as.factor(Seno$sample)
+Seno$Celltypes <- as.factor(Seno$Celltypes)
+Seno$condition2 <- as.factor(Seno$condition2)
+
+celltypes<-names(table(Seno$Celltypes))
+for (celltype in celltypes) {
+  seurat.celltype<-subset(Seno, idents=c(celltype))
+  
+  Idents(seurat.celltype)<-"condition"
+  DEG_CTRL_vs_92a.celltype<-FindMarkers(seurat.celltype, ident.1 = "NO-MI", ident.2 = "MI-D3",assay = "RNA", slot = "data", logfc.threshold = 0.1, min.pct = 0.1)
+
+  pvalues<-do_cluster_t_test(seurat.celltype, DEG_CTRL_vs_92a.celltype, group="condition",cluster = "orig.ident")
+  pvalues<-data.frame(clustered.ttest=unlist(pvalues))
+
+  DEG_CTRL_vs_92a.celltype.merged<-merge(x = DEG_CTRL_vs_92a.celltype, pvalues, by = "row.names")
+  DEG_CTRL_vs_92a.celltype.merged$celltype<-celltype
+  finalTable<-rbind(finalTable,DEG_CTRL_vs_92a.celltype.merged)
+  
+}
+outputFolder
+write.csv2(finalTable, file = paste0(outputFolder,"DEG_NOMI_vs_MID3.PerCluster_logFC>0.1_minPct>0.1.csv"), row.names = F)
+
+
+out.list <- list()
+for(i in levels(Seno$Celltypes)){
+  print(i)
+  
+  sub <- subset(Seno, Celltypes == i)
+  av <- AverageExpression(sub, features = rownames(Seno), group.by = c("condition2"), assays = "RNA")
+  out <- as.data.frame(av[["RNA"]])
+  
+  out$gene <- rownames(out)
+  out$Celltype = i
+  Idents(sub) <- "condition2"
+  test <- FindAllMarkers(sub, logfc.threshold = 0.1, test.use = "MAST", only.pos = T)
+  test <- test %>% filter(p_val_adj < 0.05)
+  
+  out$MAST.Test <- ifelse(out$gene %in% test$gene, test$p_val_adj, "no")
+  
+  for(j in unique(test$gene)){
+    tmp <- subset(test, gene == j)
+    timepoints <- paste(tmp$cluster, collapse = ";")
+    
+    out[j,"Timepoint"] <- timepoints
+  }
+  
+  out.list[[i]] <- out
+}
+
+library(purrr)
+
+out.comb <- out.list %>% reduce(full_join)
+
+write.csv(out.comb, file = "/media/tombor/Helios_scStorage/Lukas/Analysis/For other Projects/For Julian/Senolytica/All_genes_all_DEGS.csv", row.names = F)
+
+
+out.list <- list()
+for(i in levels(Seno$Celltypes)){
+  print(i)
+  
+  sub <- subset(Seno, Celltypes == i)
+  av <- AverageExpression(sub, features = rownames(Seno), group.by = c("sample", "condition2"), assays = "RNA")
+  out <- as.data.frame(av[["RNA"]])
+    out$gene <- rownames(out)
+  out$Celltype = i
+  out.list[[i]] <- out
+}
+
+out.comb <- out.list %>% reduce(full_join)
+
+write.csv(out.comb, file = "/media/tombor/Helios_scStorage/Lukas/Analysis/For other Projects/For Julian/Senolytica/All_genes_with_UMI_Mean_Samplewise.csv", row.names = F)
+
+```
+
+#Request Julian 22.06.22: Plots for Paper
+```{r}
+DefaultAssay(SeuratObject.combined)<-"RNA"
+Idents(SeuratObject.combined)<-"celltypes"
+p<-FeaturePlot(SeuratObject.combined, features = "Sema3a", slot = "data", split.by = "condition")
+ggsave(p,filename = "/media/EOS_ZMM_shared/JulianWagner/PlotsDavid_20.06.22/Seno/FeaturePlot_Sema3a_splotByAge.svg", device = "svg", width = 10, height = 6)
+
+
+
+RenameIdents()
+
+#Heatmap of DEG's Old vs Old_seno for each celltype
+topn<-finalTable %>% group_by(celltype) %>% top_n(n = 5, wt = -clustered.ttest)
+topn<-finalTable %>% group_by(celltype) %>% top_n(n = 5, wt = -avg_log2FC)
+topn<-finalTable %>% group_by(celltype) %>% top_n(n = 5, wt = -p_val_adj)
+
+
+cluster_order <- list(CM=c(0),
+                      EC=c(3,5,6,7,8,9),
+                      FB_PC=c(13),
+                      FB=c(1),
+                      IC=c(4),
+                      LYMPH=c(12),
+                      LYVE1=c(2),
+                      PACEM=c(10),
+                      PC=c(11,14),
+                      unknown = c(15)
+)
+
+Idents(SeuratObject.combined)<-"seurat_clusters"
+SeuratObject.combined <- RenameIdents(SeuratObject.combined, 
+                                      `0` = "CM", 
+                                      `1` = "FB", 
+                                      `2` = "LYVE1", 
+                                      `3` = "EC", 
+                                      `4` = "IC", 
+                                      `5` = "EC", 
+                                      `6` = "EC", 
+                                      `7` = "EC", 
+                                      `8` = "EC",
+                                      `9` = "EC",
+                                      `10` = "PACEM", 
+                                      `11` = "PC", 
+                                      `12` = "LYMPH", 
+                                      `13` = "FB_PC",
+                                      `14` = "PC", 
+                                      `15` = "unknown")
+
+
+SeuratObject.combined$celltypes_short<-Idents(SeuratObject.combined)
+
+
+marker_genes <- list(
+  CM=c(topn[topn$celltype=="Cardiomyocytes",]$Row.names),
+  EC=c(topn[topn$celltype=="Endothelial cells",]$Row.names, "Sema3a","Vegfb"),
+  FB_PC=c(topn[topn$celltype=="FB/Pericyte",]$Row.names),
+  FB=c(topn[topn$celltype=="Fibroblasts",]$Row.names),
+  IC=c(topn[topn$celltype=="Immune cells",]$Row.names),
+  LYMPH=c(topn[topn$celltype=="Lymphocytes",]$Row.names),
+  LYVE1=c(topn[topn$celltype=="Lyve1+",]$Row.names),
+  PACEM=c(topn[topn$celltype=="Pacemaker cells",]$Row.names),
+  PC=c(topn[topn$celltype=="Pericyte",]$Row.names)
+  )
+)
+
+DoHeatmap(SeuratObject.combined.old, features = topn$Row.names, assay = "RNA", slot = "data", group.by = "celltypes")
+
+Idents(SeuratObject.combined)<-"condition"
+table(SeuratObject.combined$senolytica,SeuratObject.combined$orig.ident)
+SeuratObject.combined.old<-subset(SeuratObject.combined, idents="Old")
+
+Idents(SeuratObject.combined.old)<-"orig.ident"
+
+seurat_object <- SeuratObject.combined.old
+plot_out_path <-"/media/Helios_scStorage/Julian/Senolytic-scRNA-SEQ-Mice/2ndRun/"
+tmp_p <- DotPlot_costum(seurat_object,assay = "RNA", features = marker_genes, cluster_order=cluster_order) + guides(color=guide_legend(title = "Average\nExpression"),size=guide_legend(title = "Percent\nExpressed"))
+tmp_p$guides$colour$title <- "Average\nExpression"
+tmp_p$guides$size$title <- "Percent\nExpressed"
+
+tmp_p <- tmp_p + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+ggsave(tmp_p, filename = paste0(plot_out_path,"Dotplot_top5_byavg_log2FC_DEGs_old_VS_oldseno.svg"), device = "svg", width = 6, height = 10)
+ggsave(tmp_p, filename = paste0(plot_out_path,"Dotplot_top5_byavg_log2FC_DEGs_old_VS_oldseno.pdf"), device = "pdf", width = 6, height = 10)
+
+library(ggplot2)
+
+
+
+
+```
+
+
+
+```{r}
+FeatureHeatmap(SeuratObject.combined.old, features = topn$Row.names, group.by = "condition")
+object<-SeuratObject.combined.old
+features = topn$Row.names
+group.by = "condition"
+assay="RNA"
+cols=c("skyblue","red4")
+FeatureHeatmap <- function(object, features, group.by=NULL, cols=c("skyblue","red4"), assay="RNA") {
+  require(reshape2);require(ggplot2)
+  DefaultAssay(object)<-"RNA"
+  if (!group.by %in% colnames(object@meta.data)) {
+    stop("Grouping parameter was not found in the meta data")
+  }
+  
+  #test if Genes can be found
+  for(i in 1:length(features)){
+    if (!features[i] %in% rownames(object@assays$RNA@data)) {
+      stop("Gene was not found in the Expression Matrix")
+    }
+  }
+  
+  
+  A <- data.frame(object@meta.data)
+  X <- Embeddings(object = object, reduction = "umap")
+  coord = NULL
+  for(i in rownames(A)){
+    coord <- rbind(coord, c(X[i,], i))
+  }
+  nclusters<-length(table(A[,group.by]))
+  A <- data.frame(A, coord)
+  #A$UMAP_1 <- as.numeric(levels(A$UMAP_1)[A$UMAP_1])
+  #A$UMAP_2 <- as.numeric(levels(A$UMAP_2)[A$UMAP_2])
+  A$seurat_clusters <- factor(A$seurat_clusters, levels = 0:(nclusters-1))
+  #A$sample_dummy <- as.integer(as.factor(A$sample))
+  
+  for(i in 1:length(features)){
+    a.colnames<-colnames(A)
+    a.colnames<-c(a.colnames,paste0(features[i],".exprs"))
+    A <- data.frame(A, x=GetAssayData(object, assay = assay)[c(features[i]), ])
+    colnames(A)<-a.colnames
+  }
+  
+  A.rep<-as.data.frame(lapply(A, rep, nclusters))
+  f3 <- function(variables) {
+    return(names(table(A.rep[,group.by])))
+  }
+  
+  A.rep$Cluster_fate <- ave(rep(NA,nrow(A.rep)), A.rep[,group.by], FUN = f3)
+  
+  #add new column with NA for unfitting cluster and expression value for the correct cluster
+  require(stringr)
+  featuresdot<-str_replace(string = features, pattern = "-",replacement = ".")
+  for (f in featuresdot) {
+    A.rep[,f]<-ifelse(A.rep[,group.by]==A.rep$Cluster_fate,A.rep[,paste0(f,".exprs")],NA)
+  }
+  
+  A.melt<-melt(A.rep, measure.vars = colnames(A.rep[,c((ncol(A.rep)-1):ncol(A.rep))]))
+  
+  ggplot(A.melt, aes(x=UMAP_1, y= UMAP_2, color = value))+
+    geom_point(size = 0.2)+
+    scale_color_continuous(low = cols[1], high = cols[2], na.value = "grey93", name="Scaled Expression")+
+    facet_grid(c("variable","Cluster_fate"), scales = "free", drop = FALSE)+
+    labs(y="Genes", x= group.by, title = "")+
+    theme_bw()+
+    theme(axis.text = element_blank(), axis.ticks = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), legend.position = "top", strip.text = element_text(face = "italic"))
+  
+}
+
+
+```
+
+
+
+
+
+```{r}
+tmp_p <- DotPlot_costum(seurat_object,assay = "RNA", features = marker_genes, cluster_order=cluster_order) + guides(color=guide_legend(title = "Average\nExpression"),size=guide_legend(title = "Percent\nExpressed"))
+
+features = marker_genes
+cluster_order=cluster_order
+assay = "RNA"
+cols = c("lightgrey","blue")
+col.min = -2.5
+col.max = 2.5
+dot.min = 0
+dot.scale = 6
+idents = NULL
+group.by = NULL
+split.by = NULL
+cluster.idents = FALSE
+scale = TRUE
+scale.by = "radius"
+scale.min = NA
+scale.max = NA
+cluster_order = NULL
+
+
+DotPlot_costum <- function (object, assay = NULL, features, cols = c("lightgrey", 
+                                                                     "blue"), col.min = -2.5, col.max = 2.5, dot.min = 0, dot.scale = 6, 
+                            idents = NULL, group.by = NULL, split.by = NULL, cluster.idents = FALSE, 
+                            scale = TRUE, scale.by = "radius", scale.min = NA, scale.max = NA, cluster_order = NULL) 
+{
+  assay <- assay %||% DefaultAssay(object = object)
+  DefaultAssay(object = object) <- assay
+  split.colors <- !is.null(x = split.by) && !any(cols %in% 
+                                                   rownames(x = brewer.pal.info))
+  scale.func <- switch(EXPR = scale.by, size = scale_size, 
+                       radius = scale_radius, stop("'scale.by' must be either 'size' or 'radius'"))
+  feature.groups <- NULL
+  if (is.list(features) | any(!is.na(names(features)))) {
+    feature.groups <- unlist(x = sapply(X = 1:length(features), 
+                                        FUN = function(x) {
+                                          return(rep(x = names(x = features)[x], each = length(features[[x]])))
+                                        }))
+    if (any(is.na(x = feature.groups))) {
+      warning("Some feature groups are unnamed.", call. = FALSE, 
+              immediate. = TRUE)
+    }
+    features <- unlist(x = features)
+    names(x = feature.groups) <- features
+  }
+  cells <- unlist(x = CellsByIdentities(object = object, idents = idents))
+  data.features <- FetchData(object = object, vars = features, 
+                             cells = cells)
+  data.features$id <- if (is.null(x = group.by)) {
+    Idents(object = object)[cells, drop = TRUE]
+  }
+  else {
+    object[[group.by, drop = TRUE]][cells, drop = TRUE]
+  }
+  if (!is.factor(x = data.features$id)) {
+    data.features$id <- factor(x = data.features$id)
+  }
+  id.levels <- levels(x = data.features$id)
+  data.features$id <- as.vector(x = data.features$id)
+  if (!is.null(x = split.by)) {
+    splits <- object[[split.by, drop = TRUE]][cells, drop = TRUE]
+    if (split.colors) {
+      if (length(x = unique(x = splits)) > length(x = cols)) {
+        stop("Not enough colors for the number of groups")
+      }
+      cols <- cols[1:length(x = unique(x = splits))]
+      names(x = cols) <- unique(x = splits)
+    }
+    data.features$id <- paste(data.features$id, splits, sep = "_")
+    unique.splits <- unique(x = splits)
+    id.levels <- paste0(rep(x = id.levels, each = length(x = unique.splits)), 
+                        "_", rep(x = unique(x = splits), times = length(x = id.levels)))
+  }
+  data.plot <- lapply(X = unique(x = data.features$id), FUN = function(ident) {
+    data.use <- data.features[data.features$id == ident, 
+                              1:(ncol(x = data.features) - 1), drop = FALSE]
+    avg.exp <- apply(X = data.use, MARGIN = 2, FUN = function(x) {
+      return(mean(x = expm1(x = x)))
+    })
+    pct.exp <- apply(X = data.use, MARGIN = 2, FUN = PercentAbove, 
+                     threshold = 0)
+    return(list(avg.exp = avg.exp, pct.exp = pct.exp))
+  })
+  names(x = data.plot) <- unique(x = data.features$id)
+  if (cluster.idents) {
+    mat <- do.call(what = rbind, args = lapply(X = data.plot, 
+                                               FUN = unlist))
+    mat <- scale(x = mat)
+    id.levels <- id.levels[hclust(d = dist(x = mat))$order]
+  }
+  data.plot <- lapply(X = names(x = data.plot), FUN = function(x) {
+    data.use <- as.data.frame(x = data.plot[[x]])
+    data.use$features.plot <- rownames(x = data.use)
+    data.use$id <- x
+    return(data.use)
+  })
+  data.plot <- do.call(what = "rbind", args = data.plot)
+  if (!is.null(x = id.levels)) {
+    data.plot$id <- factor(x = data.plot$id, levels = id.levels)
+  }
+  if (length(x = levels(x = data.plot$id)) == 1) {
+    scale <- FALSE
+    warning("Only one identity present, the expression values will be not scaled", 
+            call. = FALSE, immediate. = TRUE)
+  }
+  avg.exp.scaled <- sapply(X = unique(x = data.plot$features.plot), 
+                           FUN = function(x) {
+                             data.use <- data.plot[data.plot$features.plot == 
+                                                     x, "avg.exp"]
+                             if (scale) {
+                               data.use <- scale(x = data.use)
+                               data.use <- MinMax(data = data.use, min = col.min, 
+                                                  max = col.max)
+                             }
+                             else {
+                               data.use <- log(x = data.use)
+                             }
+                             return(data.use)
+                           })
+  avg.exp.scaled <- as.vector(x = t(x = avg.exp.scaled))
+  if (split.colors) {
+    avg.exp.scaled <- as.numeric(x = cut(x = avg.exp.scaled, 
+                                         breaks = 20))
+  }
+  data.plot$avg.exp.scaled <- avg.exp.scaled
+  data.plot$features.plot <- factor(x = data.plot$features.plot, 
+                                    levels = unique(features))
+  data.plot$pct.exp[data.plot$pct.exp < dot.min] <- NA
+  data.plot$pct.exp <- data.plot$pct.exp * 100
+  if (split.colors) {
+    splits.use <- vapply(X = as.character(x = data.plot$id), 
+                         FUN = gsub, FUN.VALUE = character(length = 1L), pattern = paste0("^((", 
+                                                                                          paste(sort(x = levels(x = object), decreasing = TRUE), 
+                                                                                                collapse = "|"), ")_)"), replacement = "", 
+                         USE.NAMES = FALSE)
+    data.plot$colors <- mapply(FUN = function(color, value) {
+      return(colorRampPalette(colors = c("grey", color))(20)[value])
+    }, color = cols[splits.use], value = avg.exp.scaled)
+  }
+  color.by <- ifelse(test = split.colors, yes = "colors", no = "avg.exp.scaled")
+  if (!is.na(x = scale.min)) {
+    data.plot[data.plot$pct.exp < scale.min, "pct.exp"] <- scale.min
+  }
+  if (!is.na(x = scale.max)) {
+    data.plot[data.plot$pct.exp > scale.max, "pct.exp"] <- scale.max
+  }
+  if (!is.null(x = feature.groups)) {
+    data.plot$feature.groups <- factor(x = feature.groups[data.plot$features.plot], 
+                                       levels = unique(x = feature.groups))
+  }
+  if (!is.null(cluster_order)){
+    for (i in names(cluster_order)){
+      data.plot[as.numeric(as.character(data.plot$id)) %in% cluster_order[[i]],"celltype"] <- i
+    }
+    data.plot$celltype <- factor(data.plot$celltype, levels = names(cluster_order))
+  }
+  plot <- ggplot(data = data.plot, mapping = aes_string(y = "features.plot", x = "id")) + 
+    geom_point(mapping = aes_string(size = "pct.exp", color = color.by)) + 
+    scale.func(range = c(0, dot.scale), limits = c(scale.min, scale.max)) + 
+    theme(axis.title.y = element_blank(), axis.title.x = element_blank()) + 
+    guides(size = guide_legend(title = "Percent Expressed")) + 
+    labs(x = "Cluster", y = ifelse(test = is.null(x = split.by), 
+                                   yes = "Marker genes", no = "Split Identity")) + theme_cowplot()
+  if ( (!is.null(x = feature.groups)) & (!is.null(cluster_order)) ) {
+    plot <- plot + facet_grid(vars(feature.groups), vars(celltype), scales = "free", 
+                              space = "free") + theme(panel.spacing = unit(x = 1, 
+                                                                           units = "lines"), strip.background = element_blank())
+  }
+  if ( (!is.null(x = feature.groups)) & (is.null(cluster_order)) ) {
+    plot <- plot + facet_grid(rows = vars(feature.groups), scales = "free", 
+                              space = "free") + theme(panel.spacing = unit(x = 1, 
+                                                                           units = "lines"), strip.background = element_blank())
+  }
+  if (split.colors) {
+    plot <- plot + scale_color_identity()
+  }
+  else if (length(x = cols) == 1) {
+    plot <- plot + scale_color_distiller(palette = cols)
+  }
+  else {
+    plot <- plot + scale_color_gradient2(low = "blue", mid = "grey", high = "red")
+  }
+  if (!split.colors) {
+    plot <- plot + guides(color = guide_colorbar(title = "Average Expression"))
+  }
+  return(plot)
+}
+```
+
+
+```{r}
+object = SeuratObject.combined.old
+features = marker_genes
+cluster_order=cluster_order
+assay = "RNA"
+cols = c("lightgrey","blue")
+col.min = -2.5
+col.max = 2.5
+dot.min = 0
+dot.scale = 6
+idents = NULL
+group.by = NULL
+split.by = NULL
+cluster.idents = FALSE
+scale = TRUE
+scale.by = "radius"
+scale.min = NA
+scale.max = NA
+cluster_order = NULL
+
+
+
+
+
+Heatmap_costum <- function (object, assay = NULL, features, cols = c("lightgrey", 
+                                                                     "blue"), col.min = -2.5, col.max = 2.5, dot.min = 0, dot.scale = 6, 
+                            idents = NULL, group.by = NULL, split.by = NULL, cluster.idents = FALSE, 
+                            scale = TRUE, scale.by = "radius", scale.min = NA, scale.max = NA, cluster_order = NULL) 
+{
+  assay <- assay %||% DefaultAssay(object = object)
+  DefaultAssay(object = object) <- assay
+  split.colors <- !is.null(x = split.by) && !any(cols %in% 
+                                                   rownames(x = brewer.pal.info))
+  scale.func <- switch(EXPR = scale.by, size = scale_size, 
+                       radius = scale_radius, stop("'scale.by' must be either 'size' or 'radius'"))
+  feature.groups <- NULL
+  if (is.list(features) | any(!is.na(names(features)))) {
+    feature.groups <- unlist(x = sapply(X = 1:length(features), 
+                                        FUN = function(x) {
+                                          return(rep(x = names(x = features)[x], each = length(features[[x]])))
+                                        }))
+    if (any(is.na(x = feature.groups))) {
+      warning("Some feature groups are unnamed.", call. = FALSE, 
+              immediate. = TRUE)
+    }
+    features <- unlist(x = features)
+    names(x = feature.groups) <- features
+  }
+  cells <- unlist(x = CellsByIdentities(object = object, idents = idents))
+  data.features <- FetchData(object = object, vars = features, 
+                             cells = cells)
+  data.features$id <- if (is.null(x = group.by)) {
+    Idents(object = object)[cells, drop = TRUE]
+  }
+  else {
+    object[[group.by, drop = TRUE]][cells, drop = TRUE]
+  }
+  if (!is.factor(x = data.features$id)) {
+    data.features$id <- factor(x = data.features$id)
+  }
+  id.levels <- levels(x = data.features$id)
+  data.features$id <- as.vector(x = data.features$id)
+  if (!is.null(x = split.by)) {
+    splits <- object[[split.by, drop = TRUE]][cells, drop = TRUE]
+    if (split.colors) {
+      if (length(x = unique(x = splits)) > length(x = cols)) {
+        stop("Not enough colors for the number of groups")
+      }
+      cols <- cols[1:length(x = unique(x = splits))]
+      names(x = cols) <- unique(x = splits)
+    }
+    data.features$id <- paste(data.features$id, splits, sep = "_")
+    unique.splits <- unique(x = splits)
+    id.levels <- paste0(rep(x = id.levels, each = length(x = unique.splits)), 
+                        "_", rep(x = unique(x = splits), times = length(x = id.levels)))
+  }
+  data.plot <- lapply(X = unique(x = data.features$id), FUN = function(ident) {
+    data.use <- data.features[data.features$id == ident, 
+                              1:(ncol(x = data.features) - 1), drop = FALSE]
+    avg.exp <- apply(X = data.use, MARGIN = 2, FUN = function(x) {
+      return(mean(x = expm1(x = x)))
+    })
+    pct.exp <- apply(X = data.use, MARGIN = 2, FUN = PercentAbove, 
+                     threshold = 0)
+    return(list(avg.exp = avg.exp, pct.exp = pct.exp))
+  })
+  names(x = data.plot) <- unique(x = data.features$id)
+  if (cluster.idents) {
+    mat <- do.call(what = rbind, args = lapply(X = data.plot, 
+                                               FUN = unlist))
+    mat <- scale(x = mat)
+    id.levels <- id.levels[hclust(d = dist(x = mat))$order]
+  }
+  data.plot <- lapply(X = names(x = data.plot), FUN = function(x) {
+    data.use <- as.data.frame(x = data.plot[[x]])
+    data.use$features.plot <- rownames(x = data.use)
+    data.use$id <- x
+    return(data.use)
+  })
+  data.plot <- do.call(what = "rbind", args = data.plot)
+  if (!is.null(x = id.levels)) {
+    data.plot$id <- factor(x = data.plot$id, levels = id.levels)
+  }
+  if (length(x = levels(x = data.plot$id)) == 1) {
+    scale <- FALSE
+    warning("Only one identity present, the expression values will be not scaled", 
+            call. = FALSE, immediate. = TRUE)
+  }
+  avg.exp.scaled <- sapply(X = unique(x = data.plot$features.plot), 
+                           FUN = function(x) {
+                             data.use <- data.plot[data.plot$features.plot == 
+                                                     x, "avg.exp"]
+                             if (scale) {
+                               data.use <- scale(x = data.use)
+                               data.use <- MinMax(data = data.use, min = col.min, 
+                                                  max = col.max)
+                             }
+                             else {
+                               data.use <- log(x = data.use)
+                             }
+                             return(data.use)
+                           })
+  avg.exp.scaled <- as.vector(x = t(x = avg.exp.scaled))
+  if (split.colors) {
+    avg.exp.scaled <- as.numeric(x = cut(x = avg.exp.scaled, 
+                                         breaks = 20))
+  }
+  data.plot$avg.exp.scaled <- avg.exp.scaled
+  data.plot$features.plot <- factor(x = data.plot$features.plot, 
+                                    levels = unique(features))
+  data.plot$pct.exp[data.plot$pct.exp < dot.min] <- NA
+  data.plot$pct.exp <- data.plot$pct.exp * 100
+  if (split.colors) {
+    splits.use <- vapply(X = as.character(x = data.plot$id), 
+                         FUN = gsub, FUN.VALUE = character(length = 1L), pattern = paste0("^((", 
+                                                                                          paste(sort(x = levels(x = object), decreasing = TRUE), 
+                                                                                                collapse = "|"), ")_)"), replacement = "", 
+                         USE.NAMES = FALSE)
+    data.plot$colors <- mapply(FUN = function(color, value) {
+      return(colorRampPalette(colors = c("grey", color))(20)[value])
+    }, color = cols[splits.use], value = avg.exp.scaled)
+  }
+  color.by <- ifelse(test = split.colors, yes = "colors", no = "avg.exp.scaled")
+  if (!is.na(x = scale.min)) {
+    data.plot[data.plot$pct.exp < scale.min, "pct.exp"] <- scale.min
+  }
+  if (!is.na(x = scale.max)) {
+    data.plot[data.plot$pct.exp > scale.max, "pct.exp"] <- scale.max
+  }
+  if (!is.null(x = feature.groups)) {
+    data.plot$feature.groups <- factor(x = feature.groups[data.plot$features.plot], 
+                                       levels = unique(x = feature.groups))
+  }
+  if (!is.null(cluster_order)){
+    for (i in names(cluster_order)){
+      data.plot[as.numeric(as.character(data.plot$id)) %in% cluster_order[[i]],"celltype"] <- i
+    }
+    data.plot$celltype <- factor(data.plot$celltype, levels = names(cluster_order))
+  }
+  plot <- ggplot(data = data.plot, mapping = aes_string(y = "features.plot", x = "id")) + 
+    geom_tile(mapping = aes_string(size = "pct.exp", color = color.by)) + 
+    scale.func(range = c(0, dot.scale), limits = c(scale.min, scale.max)) + 
+    theme(axis.title.y = element_blank(), axis.title.x = element_blank()) + 
+    guides(size = guide_legend(title = "Percent Expressed")) + 
+    labs(x = "Cluster", y = ifelse(test = is.null(x = split.by), 
+                                   yes = "Marker genes", no = "Split Identity")) + theme_cowplot()
+  if ( (!is.null(x = feature.groups)) & (!is.null(cluster_order)) ) {
+    plot <- plot + facet_grid(vars(feature.groups), vars(celltype), scales = "free", 
+                              space = "free") + theme(panel.spacing = unit(x = 1, 
+                                                                           units = "lines"), strip.background = element_blank())
+  }
+  if ( (!is.null(x = feature.groups)) & (is.null(cluster_order)) ) {
+    plot <- plot + facet_grid(rows = vars(feature.groups), scales = "free", 
+                              space = "free") + theme(panel.spacing = unit(x = 1, 
+                                                                           units = "lines"), strip.background = element_blank())
+  }
+  if (split.colors) {
+    plot <- plot + scale_color_identity()
+  }
+  else if (length(x = cols) == 1) {
+    plot <- plot + scale_color_distiller(palette = cols)
+  }
+  else {
+    plot <- plot + scale_color_gradient2(low = "blue", mid = "grey", high = "red")
+  }
+  if (!split.colors) {
+    plot <- plot + guides(color = guide_colorbar(title = "Average Expression"))
+  }
+  return(plot)
+}
+
+
+
+tmp_p <- Heatmap_costum(SeuratObject.combined.old,assay = "RNA", features = marker_genes, cluster_order=cluster_order) + guides(color=guide_legend(title = "Average\nExpression"),size=guide_legend(title = "Percent\nExpressed"))
+tmp_p
+SeuratObject.combined.old$celltypes_long<-SeuratObject.combined.old$celltypes
+SeuratObject.combined.old$celltypes<-SeuratObject.combined.old$celltypes_short
+Idents(SeuratObject.combined.old)<-"orig.ident"
+
+```
+
+
+
+
+
+```{r}
+plot<-FeaturePlot(SeuratObject.combined.old, features = "Sema3a", split.by = "condition2")
+ggsave(plot, filename = "/media/EOS_ZMM_shared/JulianWagner/PlotsDavid_20.06.22/Seno//FeaturePlot_Sema3a_splitbySeno.svg", device = "svg")
+```
+
+```{r}
+finalTable$FC<-2^finalTable$avg_log2FC
+finalTable_filtered<-finalTable[finalTable$FC<0.8|finalTable$FC>1.4,]
+top20<-finalTable_filtered %>% group_by(celltype) %>% top_n(n = 30, wt = -p_val_adj)
+top20<- top20 %>% filter(celltype %in% c("EC", "FB", "PC",""))
+```
+
+
+```{r}
+MT.genes <-rownames(SeuratObject.combined.old[grep(pattern = "MT-", rownames(SeuratObject.combined.old)),])
+X <- top20$Row.names
+ 
+df <- data.frame(condition = SeuratObject.combined.old$condition2
+                   ,Sample = SeuratObject.combined.old$orig.ident)
+
+#get expression for cells
+df.melt.sum <- data.frame(row.names = c("condition", "Sample", "variable", "Mean", "SEM"))
+i=0
+for(j in X){
+    i=i+1
+    
+
+    df[,j] <- expm1(SeuratObject.combined.old@assays$RNA@data[j,]) # non logarithmic space
+    #in 100 gene steps
+    if(i %% 100 == 0){
+      message(paste0("Finished ",i , " genes\n"))
+      df.melt <- melt(df)
+      df.melt$condition <- as.factor(df.melt$condition)
+      df.melt$Sample <- as.factor(df.melt$Sample)
+      #grouping, SEM calculation
+      SEM <- function(x) sqrt(var(x)/length(x))
+      df.melt.sum.tmp <- df.melt %>% dplyr::group_by(condition, Sample, variable) %>% dplyr::summarize(Mean = mean(value), SEM = SEM(value)) %>% ungroup()
+      df.melt.sum<-rbind(df.melt.sum,df.melt.sum.tmp)
+      
+      df <- data.frame(condition = SeuratObject.combined.old$condition2
+                     ,Sample = SeuratObject.combined.old$orig.ident)
+    }
+}
+  
+scale_this <- function(x){
+  (x - mean(x, na.rm=TRUE)) / sd(x, na.rm=TRUE)
+}
+  df.melt.scale <- df.melt.sum %>% dplyr::group_by(variable) %>% dplyr::mutate(scaled_Mean = scale_this(Mean))
+#kick out all features with 0 expression
+df.melt.scale <- subset(df.melt.scale, !is.na(df.melt.scale$scaled_Mean))
+
+df.melt.scale$Z.Score <- cut(df.melt.scale$scaled_Mean, breaks = 10)
+
+df.melt.scale$Z.Score <- factor(df.melt.scale$Z.Score, levels = rev(levels(df.melt.scale$Z.Score)))
+textcol <- "grey40"
+
+ggplot(df.melt.scale, aes(x= Sample, y = variable, fill = Z.Score))+ 
+  geom_tile()+
+  geom_col()
+  facet_grid(~condition, scales = "free", space = "free")+
+  scale_fill_manual(values=brewer.pal(10,"RdBu"),na.value="grey90")+
+  theme_pubclean()+
+  theme(legend.position="right",legend.direction="vertical",
+        legend.title=element_text(colour=textcol),
+        legend.margin=margin(grid::unit(0,"cm")),
+        legend.text=element_text(colour=textcol,size=7,face="bold"),
+        legend.key.height=grid::unit(0.8,"cm"),
+        legend.key.width=grid::unit(0.2,"cm"),
+        axis.text.x=element_text(size=10,angle = 90,colour=textcol),
+        axis.text.y=element_text(vjust=0,colour=textcol, size = 0,),
+        axis.ticks=element_line(size=0.4),
+        plot.background=element_blank(),
+        panel.border=element_blank(),
+        plot.margin=margin(0.7,0.4,0.1,0.2,"cm"),
+        plot.title=element_text(colour=textcol,hjust=0,size=14,face="bold"))
+```
+
+
+
+```{r}
+if (!require("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+
+BiocManager::install("dittoSeq")
+
+library(dittoSeq)
+genes=c(top20$Row.names[1:20])
+dittoHeatmap(SeuratObject.combined.old ,genes,
+         annot.by = c("celltypes"), assay = "RNA", slot = "data", )
+```
+
+```{r}
+# Genes for heatmap 
+df <- data.frame(Gene = top20$Row.names, FC = 2^top20$FC, Celltype = top20$celltype)
+
+
+A <- data.frame(condition = SeuratObject.combined.old$condition2, Sample = SeuratObject.combined.old$orig.ident,  Celltype = SeuratObject.combined.old$celltypes)
+for(i in df$Gene){
+  A <- data.frame(A, SeuratObject.combined.old@assays$RNA@data[i, ])
+}
+colnames(A) = c("condition", "Sample", "Celltype", df$Gene)
+
+melt.A <- melt(A, id.vars = c("Sample","condition", "Celltype"))
+melt.A <- melt(A)
+
+
+A.sum <- melt.A %>% group_by(Sample, variable, condition, Celltype) %>% summarize(Mean = mean(value)) %>% ungroup() %>% group_by(variable, Celltype) %>% mutate(Z.score = scale(Mean))
+
+
+library(RColorBrewer)
+cols <-brewer.pal(9, "Oranges")
+
+
+colnames(top20)<-c("variable","p_val","avg_log2FC","pct.1","pct.2","p_val_adj","clustered.ttest","Celltype","FC" )
+
+A.sum.filtered<-left_join(top20, A.sum, )
+
+
+df.merge <- full_join(df, df.decast)
+
+df.melt <- melt(df.merge, id.vars = c("Gene", "Group", "Type", "FC")) %>% filter(Gene %!in% c("Jun", "Cp"))
+
+A.sum.filtered$variable<-as.factor(A.sum.filtered$variable)
+
+ggplot(data = A.sum.filtered, aes(x = Sample, y = variable, fill = Z.score))+
+  geom_tile()+
+  scale_fill_gradient2(low = "darkblue", mid = cols[4], high = "red")+
+  theme_pubclean()+
+  facet_grid(Celltype~condition, scales = "free", space = "free")+
+  theme(, legend.position = "right", axis.text.x = element_text(angle = 45, hjust = 1))+
+  labs(y = "Gene", x = "Sample")
+ggsave("/media/EOS_ZMM_shared/JulianWagner/PlotsDavid_20.06.22/Seno/Heatmap_topDEG_EC_FB_PC.svg", height = 10, width = 5, device = "svg")
+colnames(A.sum.filtered)
+
+
+```
+
+#Mean SEM Plot
+```{r}
+DO.Mean.SEM.Graphs <- function(SeuratObject, Features, ListTest=NULL){ 
+  require(ggplot2)
+  require(ggpubr)
+  require(tidyverse)
+  require(reshape2)
+  #SEM function defintion
+  SEM <- function(x) sqrt(var(x)/length(x))
+  #create data frame with conditions from provided SeuratObject, aswell as original identifier of samples
+  df<-data.frame(condition=SeuratObject$condition
+                 ,orig.ident = SeuratObject$orig.ident)
+  #get expression values for genes from individual cells, add to df
+  for(i in Features){
+    df[,i] <- SeuratObject@assays$RNA@data[i,]
+  }
+  
+  #melt results 
+  df.melt <- melt(df)
+  #group results and summarize, also add/use SEM 
+  df.melt.sum <- df.melt %>% 
+    dplyr::group_by(condition, variable) %>% 
+    dplyr::summarise(Mean = mean(value), SEM = SEM(value))
+  #second dataframe containing mean values for individual samples
+  df.melt.orig <- df.melt %>% 
+    dplyr::group_by(condition, variable, orig.ident) %>% 
+    dplyr::summarise(Mean = mean(value))
+
+  #create comparison list for t.test, always against control, so please check your sample ordering
+  # ,alternative add your own list as argument
+  if (is.null(ListTest)) {
+    #if ListTest is empty, so grep the ctrl conditions out of the list 
+    # and define ListTest comparing every other condition with that ctrl condition
+    cat("ListTest empty, comparing every sample with provided control")
+    conditions <- unique(SeuratObject$condition)
+    ctrl.condition <- conditions[grep(pattern = paste(c("CTRL","Ctrl"),collapse ="|")
+         ,conditions)[1]]
+    df.melt.sum$condition <- factor(df.melt.sum$condition
+                                    ,levels = c(ctrl.condition,levels(factor(df.melt.sum$condition))[!(levels(factor(df.melt.sum$condition)) %in% ctrl.condition)]))
+    #create ListTest
+    ListTest <- list()
+    for (i in 1:length(conditions)) {
+      cndtn <- conditions[i] 
+      if(cndtn!=ctrl.condition)
+        {
+          ListTest[[i]] <- c(ctrl.condition,cndtn)
+        }
+      }
+    }
+  #delete Null values, created by count index
+  ListTest <- ListTest[!sapply(ListTest, is.null)]
+  ctrl.condition <- ListTest[[1]][1]
+  #Factor setting for order
+  
+  #create barplot with significance
+  ggplot(df.melt.sum, aes(x = condition, y = Mean, fill = condition))+
+    geom_col(color = "black")+
+    geom_errorbar(aes(ymin = Mean-SEM, ymax = Mean+SEM), width = .2)+
+    geom_jitter(data = df.melt.orig, aes(x=condition,y=Mean), size = 1, shape=1)+
+    #ordering, control always first
+    scale_x_discrete(limits=c(ctrl.condition,levels(factor(df.melt.sum$condition))[!(levels(factor(df.melt.sum$condition)) %in% ctrl.condition)]))+
+    #t-test, always against control, using means from orig sample identifier
+    stat_compare_means(data=df.melt.orig, comparisons = ListTest, method = "t.test", size=3)+
+    facet_wrap(~variable, ncol = 9, scales = "free") +
+    scale_fill_manual(values = c("#FFFFFF","#BDD7E7" ,"#6BAED6", "#3182BD", "#08519C","#0099CC","#00BFFF","#63D1F4","#00688B")
+                      , name = "Condition")+
+    labs( title = "", y = "Mean UMI") +
+    theme_classic() +
+    theme(axis.text.x = element_text(face = "bold", color = "black",angle = 45,hjust = 1, size = 18),
+        axis.text.y = element_text(color = "black", size = 18),
+        axis.title.x = element_blank(),
+        axis.title = element_text(size = 18, color = "black"),
+        plot.title = element_text(face = "bold", size = 18, hjust = 0.5),
+        axis.line = element_line(color = "black", size = .6),
+        strip.text.x = element_text(size = 20, color = "black"),
+        legend.position = "bottom")
+    
+}
+
+
+Idents(SeuratObject.combined.old)<-"celltypes_short"
+SeuratObject.combined.old$condition<-SeuratObject.combined.old$condition2
+SeuratObject.combined.old.EC<-subset(SeuratObject.combined.old,idents = "EC")
+Idents(SeuratObject.combined.old.EC)<-"orig.ident"
+plot<-DO.Mean.SEM.Graphs(SeuratObject.combined.old.EC, Features = c("Sema3a", "Ntn1", "Slit3", "Vegfb", "Nrtn" , "Manf"), returnValues = T)
+openxlsx::write.xlsx(plot,file = "/media/EOS_ZMM_shared/JulianWagner/PlotsDavid_20.06.22/Seno/MeanSEM_EC_MarkerGenes.xlsx", rowName=T, colNames=T)
+
+plot<-DO.Mean.SEM.Graphs(SeuratObject.combined.old.EC, Features = c("Sema3a", "Ntn1", "Slit3", "Vegfb", "Nrtn" , "Manf"))
+plot<-plot+labs(title = "EC")
+ggsave(plot = plot,filename = "/media/EOS_ZMM_shared/JulianWagner/PlotsDavid_20.06.22/Seno/MeanSEM_EC_MarkerGenes.svg", height = 5, width = 15, device = "svg")
+
+SeuratObject.combined.old.PC<-subset(SeuratObject.combined.old,idents = "PC")
+Idents(SeuratObject.combined.old.PC)<-"orig.ident"
+plot<-DO.Mean.SEM.Graphs(SeuratObject.combined.old.PC, Features = c("Sema3a", "Ntn1", "Slit3", "Vegfb", "Nrtn" , "Manf"), returnValues = T)
+openxlsx::write.xlsx(plot,file = "/media/EOS_ZMM_shared/JulianWagner/PlotsDavid_20.06.22/Seno/MeanSEM_PC_MarkerGenes.xlsx", rowName=T, colNames=T)
+
+plot<-DO.Mean.SEM.Graphs(SeuratObject.combined.old.PC, Features = c("Sema3a", "Ntn1", "Slit3", "Vegfb", "Nrtn" , "Manf"))
+plot<-plot+labs(title = "PC")
+ggsave(plot = plot,filename = "/media/EOS_ZMM_shared/JulianWagner/PlotsDavid_20.06.22/Seno/MeanSEM_PC_MarkerGenes.svg", height = 5, width = 15, device = "svg")
+
+
+SeuratObject.combined.old.FB<-subset(SeuratObject.combined.old,idents = "FB")
+Idents(SeuratObject.combined.old.FB)<-"condition2"
+plot<-DO.Mean.SEM.Graphs(SeuratObject.combined.old.FB, Features = c("Sema3a", "Ntn1", "Slit3", "Vegfb", "Nrtn" , "Manf"), returnValues = T)
+openxlsx::write.xlsx(plot,file = "/media/EOS_ZMM_shared/JulianWagner/PlotsDavid_20.06.22/Seno/MeanSEM_FB_MarkerGenes.xlsx", rowName=T, colNames=T)
+
+plot<-DO.Mean.SEM.Graphs(SeuratObject.combined.old.FB, Features = c("Sema3a", "Ntn1", "Slit3", "Vegfb", "Nrtn" , "Manf"))
+plot<-plot+labs(title = "FB")
+ggsave(plot = plot,filename = "/media/EOS_ZMM_shared/JulianWagner/PlotsDavid_20.06.22/Seno/MeanSEM_FB_MarkerGenes.svg", height = 5, width = 15, device = "svg")
+
+
+```
+
+
+
+
+
